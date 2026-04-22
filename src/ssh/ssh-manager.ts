@@ -32,6 +32,8 @@ export interface WireguardStatus {
   running: boolean;
   peers: number;
   transfer: string;
+  public_key?: string;
+  listen_port?: number;
 }
 
 export interface SSHConnectConfig {
@@ -345,6 +347,14 @@ export class SSHManager {
     const output = result.output;
     const peersCount = (output.match(/peer:/g) || []).length;
     
+    // Parse public key
+    const pubKeyMatch = output.match(/public key: (.+)/);
+    const publicKey = pubKeyMatch ? pubKeyMatch[1].trim() : undefined;
+
+    // Parse listen port
+    const portMatch = output.match(/listening port: (\d+)/);
+    const listenPort = portMatch ? parseInt(portMatch[1]) : undefined;
+
     // Simple parsing for transfer (example: "transfer: 1.23 GiB received, 4.56 GiB sent")
     const transferMatch = output.match(/transfer: (.+)/);
     const transfer = transferMatch ? transferMatch[1] : '0';
@@ -352,7 +362,9 @@ export class SSHManager {
     return {
       running: true,
       peers: peersCount,
-      transfer
+      transfer,
+      public_key: publicKey,
+      listen_port: listenPort
     };
   }
 

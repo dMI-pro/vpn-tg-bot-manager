@@ -8,6 +8,13 @@ export interface MyWizardSession extends Scenes.WizardSessionData {
     username?: string;
     password?: string;
   };
+  configData?: {
+    vpsId?: number;
+    deviceName?: string;
+    privateKey?: string;
+    publicKey?: string;
+    assignedIp?: string;
+  };
 }
 
 export interface MyContext extends Context {

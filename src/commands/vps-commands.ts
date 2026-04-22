@@ -139,9 +139,25 @@ export function setupVPSCommands(bot: Telegraf<MyContext>) {
 *Доступные команды:*
 /add_vps - Добавить новый сервер
 /my_vpss - Список твоих серверов
+/create_config - Создать новый VPN конфиг
+/my_configs - Мои VPN конфигурации
 /help - Показать это сообщение
     `;
     await ctx.replyWithMarkdown(welcome);
+  });
+
+  // /help
+  bot.help(async (ctx) => {
+    const helpText = `
+*Доступные команды:*
+/add_vps - Добавить новый сервер
+/my_vpss - Список твоих серверов
+/create_config - Создать новый VPN конфиг
+/my_configs - Мои VPN конфигурации
+/vps_status <id> - Статус сервера
+/remove_vps <id> - Удалить сервер
+    `;
+    await ctx.replyWithMarkdown(helpText);
   });
 
   // /my_vpss
