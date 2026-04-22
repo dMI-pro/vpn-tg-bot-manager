@@ -1,9 +1,9 @@
-import { Telegraf } from 'telegraf';
+import { Telegraf, session, Scenes } from 'telegraf';
 import dotenv from 'dotenv';
-import { initDb } from './database/db.js';
 import logger from './utils/logger.js';
 import { MyContext } from './types/context.js';
-import { setupStartCommand } from './commands/start.js';
+import { setupVPSCommands, addVpsScene } from './commands/vps-commands.js';
+import dbManager from './database/db.js';
 
 dotenv.config();
 
@@ -16,11 +16,15 @@ if (!token) {
 
 const bot = new Telegraf<MyContext>(token);
 
-// Initialize Database
-await initDb();
+// Stage setup
+const stage = new Scenes.Stage<MyContext>([addVpsScene]);
+
+// Middlewares
+bot.use(session());
+bot.use(stage.middleware());
 
 // Setup Commands
-setupStartCommand(bot);
+setupVPSCommands(bot);
 
 // Error Handling
 bot.catch((err: any, ctx: MyContext) => {

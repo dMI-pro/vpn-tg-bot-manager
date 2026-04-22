@@ -1,5 +1,16 @@
-import { Context } from 'telegraf';
+import { Context, Scenes } from 'telegraf';
+
+export interface MyWizardSession extends Scenes.WizardSessionData {
+  vpsData?: {
+    name?: string;
+    host?: string;
+    port?: number;
+    username?: string;
+    password?: string;
+  };
+}
 
 export interface MyContext extends Context {
-  // Add custom session or state properties here if needed
+  scene: Scenes.SceneContextScene<MyContext, MyWizardSession>;
+  wizard: Scenes.WizardContextWizard<MyContext>;
 }
