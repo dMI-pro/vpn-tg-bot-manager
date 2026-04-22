@@ -93,6 +93,18 @@ export class DatabaseManager {
     });
   }
 
+  async getVPS(vpsId: number): Promise<any | null> {
+    return new Promise((resolve, reject) => {
+      try {
+        const stmt = this.db.prepare('SELECT * FROM vps_servers WHERE id = ?');
+        const row = stmt.get(vpsId);
+        resolve(row || null);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
   async updateVPSStatus(vpsId: number, status: string): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
