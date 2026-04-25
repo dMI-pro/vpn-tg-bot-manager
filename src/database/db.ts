@@ -27,8 +27,30 @@ export class DatabaseManager {
   async addUser(telegramId: number, username?: string): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        const stmt = this.db.prepare('INSERT OR IGNORE INTO users (telegram_id, username) VALUES (?, ?)');
+        const stmt = this.db.prepare('INSERT OR IGNORE INTO users (telegram_id, username, is_banned) VALUES (?, ?, 0)');
         stmt.run(telegramId, username || null);
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  async isBanned(telegramId: number): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      try {
+        const row = this.db.prepare('SELECT is_banned FROM users WHERE telegram_id = ?').get(telegramId) as any;
+        resolve(row ? row.is_banned === 1 : false);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  async banUser(telegramId: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        this.db.prepare('UPDATE users SET is_banned = 1 WHERE telegram_id = ?').run(telegramId);
         resolve();
       } catch (error) {
         reject(error);
@@ -155,6 +177,21 @@ export class DatabaseManager {
       try {
         const stmt = this.db.prepare('DELETE FROM vps_servers WHERE id = ? AND user_telegram_id = ?');
         const result = stmt.run(vpsId, userTelegramId);
+        if (result.changes === 0) {
+          throw new Error(`VPS with id ${vpsId} not found or doesn't belong to user ${userTelegramId}`);
+        }
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  async updateVPSPassword(vpsId: number, userTelegramId: number, encryptedPassword: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        const stmt = this.db.prepare('UPDATE vps_servers SET encrypted_password = ?, status = \'unknown\', fail_count = 0 WHERE id = ? AND user_telegram_id = ?');
+        const result = stmt.run(encryptedPassword, vpsId, userTelegramId);
         if (result.changes === 0) {
           throw new Error(`VPS with id ${vpsId} not found or doesn't belong to user ${userTelegramId}`);
         }

@@ -38,6 +38,27 @@ export const createConfigScene = new Scenes.WizardScene<MyContext>(
     }
 
     const vpsId = parseInt(ctx.callbackQuery.data.split(':')[1]);
+    const telegramId = ctx.from!.id;
+
+    // Проверка статуса VPS перед продолжением
+    const vps = await dbManager.getVPSById(vpsId, telegramId);
+    if (!vps) {
+      await ctx.answerCbQuery('Сервер не найден.');
+      return ctx.scene.leave();
+    }
+
+    if (vps.status === 'auth_error') {
+      await ctx.answerCbQuery();
+      await ctx.editMessageText('⚠️ Ошибка аутентификации на этом сервере. Пожалуйста, обновите пароль с помощью команды /update_vps_password');
+      return ctx.scene.leave();
+    }
+
+    if (vps.status === 'offline') {
+      await ctx.answerCbQuery();
+      await ctx.editMessageText('🔴 Сервер офлайн. Пожалуйста, проверьте ваш сервер и попробуйте позже.');
+      return ctx.scene.leave();
+    }
+
     ctx.scene.session.configData = { vpsId };
     
     await ctx.answerCbQuery();

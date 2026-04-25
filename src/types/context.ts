@@ -1,6 +1,7 @@
 import { Context, Scenes } from 'telegraf';
 
 export interface MyWizardSession extends Scenes.WizardSessionData {
+  vpsId?: number;
   vpsData?: {
     name?: string;
     host?: string;

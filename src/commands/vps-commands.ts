@@ -8,6 +8,76 @@ import logger from '../utils/logger.js';
 // --- /add_vps Wizard Scene ---
 
 export const ADD_VPS_SCENE_ID = 'ADD_VPS_SCENE';
+export const UPDATE_VPS_PASSWORD_SCENE_ID = 'UPDATE_VPS_PASSWORD_SCENE';
+
+/**
+ * Сцена обновления пароля VPS
+ */
+export const updateVpsPasswordScene = new Scenes.WizardScene<MyContext>(
+  UPDATE_VPS_PASSWORD_SCENE_ID,
+  // Step 1: Choose VPS
+  async (ctx) => {
+    const telegramId = ctx.from!.id;
+    const vpss = await dbManager.getUserVPSS(telegramId);
+
+    if (vpss.length === 0) {
+      await ctx.reply('У вас нет добавленных серверов.');
+      return ctx.scene.leave();
+    }
+
+    const buttons = vpss.map(vps => [
+      Markup.button.callback(`${vps.name} (${vps.host})`, `update_pwd:${vps.id}`)
+    ]);
+
+    await ctx.reply('Выберите сервер для обновления пароля:', Markup.inlineKeyboard(buttons));
+    return ctx.wizard.next();
+  },
+  // Step 2: New Password
+  async (ctx) => {
+    if (!ctx.callbackQuery || !('data' in ctx.callbackQuery)) return;
+    
+    const vpsId = parseInt(ctx.callbackQuery.data.split(':')[1]);
+    ctx.scene.session.vpsId = vpsId;
+
+    await ctx.answerCbQuery();
+    await ctx.editMessageText('Введите новый SSH пароль (сообщение будет удалено):');
+    return ctx.wizard.next();
+  },
+  // Step 3: Save & Test
+  async (ctx) => {
+    const password = (ctx.message as any)?.text;
+    if (!password) {
+      await ctx.reply('Пожалуйста, введите пароль:');
+      return;
+    }
+
+    try {
+      await ctx.deleteMessage();
+    } catch (e) {}
+
+    const vpsId = ctx.scene.session.vpsId!;
+    const telegramId = ctx.from!.id;
+
+    await ctx.reply('⌛ Обновляю пароль и проверяю соединение...');
+
+    try {
+      const encryptedPassword = encrypt(password);
+      await dbManager.updateVPSPassword(vpsId, telegramId, encryptedPassword);
+      
+      const testResult = await sshManager.testConnection(vpsId);
+      if (testResult.success) {
+        await ctx.reply('✅ Пароль успешно обновлен и проверен!');
+      } else {
+        await ctx.reply(`⚠️ Пароль обновлен в базе, но тест подключения не прошел: ${testResult.error}`);
+      }
+    } catch (error: any) {
+      logger.error('Error updating VPS password', error);
+      await ctx.reply(`❌ Ошибка: ${error.message}`);
+    }
+
+    return ctx.scene.leave();
+  }
+);
 
 export const addVpsScene = new Scenes.WizardScene<MyContext>(
   ADD_VPS_SCENE_ID,
@@ -146,12 +216,16 @@ export function setupVPSCommands(bot: Telegraf<MyContext>) {
     await ctx.replyWithMarkdown(welcome);
   });
 
+  // /update_vps_password
+  bot.command('update_vps_password', (ctx) => ctx.scene.enter(UPDATE_VPS_PASSWORD_SCENE_ID));
+
   // /help
   bot.help(async (ctx) => {
     const helpText = `
 *Доступные команды:*
 /add_vps - Добавить новый сервер
 /my_vpss - Список твоих серверов
+/update_vps_password - Обновить пароль VPS
 /create_config - Создать новый VPN конфиг
 /my_configs - Мои VPN конфигурации
 /vps_status <id> - Статус сервера
