@@ -5,6 +5,7 @@ import { MyContext } from './types/context.js';
 import { setupVPSCommands, addVpsScene } from './commands/vps-commands.js';
 import { setupWireguardCommands, createConfigScene } from './commands/wireguard-commands.js';
 import dbManager from './database/db.js';
+import { MonitoringService } from './services/monitoring.js';
 
 dotenv.config();
 
@@ -27,6 +28,10 @@ bot.use(stage.middleware());
 // Setup Commands
 setupVPSCommands(bot);
 setupWireguardCommands(bot);
+
+// Start Monitoring
+const monitoring = new MonitoringService(bot);
+monitoring.start();
 
 // Error Handling
 bot.catch((err: any, ctx: MyContext) => {

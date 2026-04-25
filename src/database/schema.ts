@@ -21,6 +21,7 @@ export function createTables(db: Database): void {
       username TEXT NOT NULL,
       encrypted_password TEXT,
       status TEXT DEFAULT 'unknown',
+      fail_count INTEGER DEFAULT 0,
       last_check DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_telegram_id) REFERENCES users(telegram_id) ON DELETE CASCADE

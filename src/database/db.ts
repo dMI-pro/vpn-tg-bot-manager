@@ -105,15 +105,45 @@ export class DatabaseManager {
     });
   }
 
-  async updateVPSStatus(vpsId: number, status: string): Promise<void> {
+  async updateVPSStatus(vpsId: number, status: string, resetFailCount: boolean = false): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        const stmt = this.db.prepare('UPDATE vps_servers SET status = ?, last_check = CURRENT_TIMESTAMP WHERE id = ?');
+        const failCountUpdate = resetFailCount ? ', fail_count = 0' : ', fail_count = fail_count + 1';
+        const stmt = this.db.prepare(`UPDATE vps_servers SET status = ?, last_check = CURRENT_TIMESTAMP${failCountUpdate} WHERE id = ?`);
         const result = stmt.run(status, vpsId);
         if (result.changes === 0) {
           throw new Error(`VPS with id ${vpsId} not found`);
         }
         resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  async getAllVPSS(): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      try {
+        const stmt = this.db.prepare('SELECT * FROM vps_servers');
+        const rows = stmt.all();
+        resolve(rows);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  async getStats(): Promise<any> {
+    return new Promise((resolve, reject) => {
+      try {
+        const totalVps = this.db.prepare('SELECT COUNT(*) as count FROM vps_servers').get() as any;
+        const totalConfigs = this.db.prepare('SELECT COUNT(*) as count FROM wireguard_configs').get() as any;
+        const problematicVps = this.db.prepare("SELECT * FROM vps_servers WHERE status != 'online'").all();
+        resolve({
+          totalVps: totalVps.count,
+          totalConfigs: totalConfigs.count,
+          problematicVps
+        });
       } catch (error) {
         reject(error);
       }

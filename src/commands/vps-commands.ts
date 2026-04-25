@@ -160,6 +160,54 @@ export function setupVPSCommands(bot: Telegraf<MyContext>) {
     await ctx.replyWithMarkdown(helpText);
   });
 
+  // /health (Admin only - simplified for now)
+  bot.command('health', async (ctx) => {
+    try {
+      const stats = await dbManager.getStats();
+      let message = `📊 *Системный отчет*\n\n`;
+      message += `🖥 Всего серверов: ${stats.totalVps}\n`;
+      message += `🔑 Всего конфигов: ${stats.totalConfigs}\n\n`;
+
+      if (stats.problematicVps.length > 0) {
+        message += `⚠️ *Проблемные VPS:*\n`;
+        for (const vps of stats.problematicVps) {
+          message += `- ${vps.name} (${vps.host}): ${vps.status}\n`;
+        }
+      } else {
+        message += `✅ Все системы работают нормально.`;
+      }
+
+      await ctx.replyWithMarkdown(message);
+    } catch (error) {
+      await ctx.reply('Ошибка при получении статистики.');
+    }
+  });
+
+  // /refresh_vps <id>
+  bot.command('refresh_vps', async (ctx) => {
+    const text = ctx.message.text.split(' ');
+    if (text.length < 2) return ctx.reply('Использование: /refresh_vps <vps_id>');
+    const vpsId = parseInt(text[1]);
+    const telegramId = ctx.from.id;
+
+    const vps = await dbManager.getVPSById(vpsId, telegramId);
+    if (!vps) return ctx.reply('Сервер не найден.');
+
+    await ctx.reply('⌛ Принудительная проверка статуса...');
+    
+    try {
+      const result = await sshManager.getWireguardStatus(vpsId);
+      if (result.running) {
+        await dbManager.updateVPSStatus(vpsId, 'online', true);
+        await ctx.reply(`✅ Сервер *${vps.name}* онлайн и WireGuard работает.`);
+      } else {
+        await ctx.reply(`❌ Сервер *${vps.name}* недоступен или WireGuard не запущен.`);
+      }
+    } catch (error: any) {
+      await ctx.reply(`❌ Ошибка проверки: ${error.message}`);
+    }
+  });
+
   // /my_vpss
   bot.command('my_vpss', async (ctx) => {
     const telegramId = ctx.from.id;
@@ -170,8 +218,19 @@ export function setupVPSCommands(bot: Telegraf<MyContext>) {
     }
 
     for (const vps of vpss) {
-      const statusIcon = vps.status === 'online' ? '🟢' : vps.status === 'auth_error' ? '⚠️' : '🔴';
-      const statusText = vps.status === 'online' ? 'Онлайн' : vps.status === 'auth_error' ? 'Ошибка аут.' : 'Офлайн';
+      let statusIcon = '🔴';
+      let statusText = 'Офлайн';
+      
+      if (vps.status === 'online') {
+        statusIcon = '🟢';
+        statusText = 'Онлайн';
+      } else if (vps.status === 'auth_error') {
+        statusIcon = '⚠️';
+        statusText = 'Ошибка аут.';
+      } else if (vps.status === 'wg_stopped') {
+        statusIcon = '🟠';
+        statusText = 'WG остановлен';
+      }
       
       const message = `
 📡 *Название:* ${vps.name}
