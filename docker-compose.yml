@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  vpn-bot:
+    build: .
+    container_name: vpn-tg-bot
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DATABASE_PATH=/app/data/vpn-bot.db
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./backups:/app/backups
+    # Если боту нужен доступ к сети хоста (обычно не требуется, так как он клиент SSH)
+    # network_mode: "host" 
+    # Но лучше использовать стандартный bridge, если нет специфичных причин
+
+networks:
+  default:
+    name: vpn-bot-network
