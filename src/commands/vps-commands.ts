@@ -285,6 +285,11 @@ export function setupVPSCommands(bot: Telegraf<MyContext>) {
     }
   });
 
+  // /update_vps_password
+  bot.command('update_vps_password', async (ctx) => {
+    return ctx.scene.enter(UPDATE_VPS_PASSWORD_SCENE_ID);
+  });
+
   // /debug (Admin only)
   bot.command('debug', async (ctx) => {
     const adminId = process.env.ADMIN_TELEGRAM_ID;
