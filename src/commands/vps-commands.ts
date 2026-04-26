@@ -1,9 +1,12 @@
 import { Scenes, Markup, Telegraf } from 'telegraf';
+import fs from 'fs';
+import path from 'path';
 import { MyContext } from '../types/context.js';
 import dbManager from '../database/db.js';
 import sshManager from '../ssh/ssh-manager.js';
 import { encrypt } from '../utils/encryption.js';
 import logger from '../utils/logger.js';
+import { validateIP, validatePort } from '../utils/validator.js';
 
 // --- /add_vps Wizard Scene ---
 
@@ -101,7 +104,7 @@ export const addVpsScene = new Scenes.WizardScene<MyContext>(
   // Step 3: Port
   async (ctx) => {
     const text = (ctx.message as any)?.text;
-    if (!text) {
+    if (!text || !validateIP(text)) {
       await ctx.reply('Пожалуйста, введите корректный IP или домен:');
       return;
     }
@@ -113,8 +116,8 @@ export const addVpsScene = new Scenes.WizardScene<MyContext>(
   async (ctx) => {
     const text = (ctx.message as any)?.text;
     const port = parseInt(text);
-    if (isNaN(port)) {
-      await ctx.reply('Пожалуйста, введите числовой порт:');
+    if (isNaN(port) || !validatePort(port)) {
+      await ctx.reply('Пожалуйста, введите числовой порт (1-65535):');
       return;
     }
     ctx.scene.session.vpsData!.port = port;
@@ -279,6 +282,61 @@ export function setupVPSCommands(bot: Telegraf<MyContext>) {
       }
     } catch (error: any) {
       await ctx.reply(`❌ Ошибка проверки: ${error.message}`);
+    }
+  });
+
+  // /debug (Admin only)
+  bot.command('debug', async (ctx) => {
+    const adminId = process.env.ADMIN_TELEGRAM_ID;
+    if (!adminId || ctx.from.id !== parseInt(adminId)) {
+      return ctx.reply('⛔ У вас нет прав администратора.');
+    }
+
+    try {
+      const stats = await dbManager.getStats();
+      const vpss = await dbManager.getAllVPSS();
+      
+      // Размер БД
+      const dbFile = process.env.DATABASE_PATH || 'vpn-bot.db';
+      let dbSize = 'unknown';
+      if (fs.existsSync(dbFile)) {
+        const stat = fs.statSync(dbFile);
+        dbSize = (stat.size / 1024 / 1024).toFixed(2) + ' MB';
+      }
+
+      // Последние ошибки из логов
+      let lastErrors = 'No errors found';
+      const errorLogPath = path.join('logs', 'error.log');
+      if (fs.existsSync(errorLogPath)) {
+        const lines = fs.readFileSync(errorLogPath, 'utf-8').split('\n').filter(Boolean);
+        lastErrors = lines.slice(-5).map(l => {
+          try {
+            const j = JSON.parse(l);
+            return `[${j.timestamp}] ${j.message}`;
+          } catch (e) {
+            return l;
+          }
+        }).join('\n');
+      }
+
+      let message = `🛠 *Debug Info*\n\n`;
+      message += `📊 *Статистика:*\n`;
+      message += `- Серверов: ${stats.totalVps}\n`;
+      message += `- Конфигов: ${stats.totalConfigs}\n`;
+      message += `- Размер БД: ${dbSize}\n\n`;
+
+      message += `📡 *Статус SSH соединений:*\n`;
+      for (const vps of vpss) {
+        message += `- ${vps.name} (${vps.host}): ${vps.status}\n`;
+      }
+
+      message += `\n❌ *Последние 5 ошибок:*\n`;
+      message += `\`\`\`\n${lastErrors}\n\`\`\``;
+
+      await ctx.replyWithMarkdown(message);
+    } catch (error: any) {
+      logger.error('Error in /debug command', error);
+      await ctx.reply(`❌ Ошибка при получении отладочной информации: ${error.message}`);
     }
   });
 
